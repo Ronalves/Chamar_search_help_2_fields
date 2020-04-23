@@ -1,0 +1,98 @@
+*----------------------------------------------------------------------*
+***INCLUDE MYOTPVEIC_YOTMVEICI01.
+*----------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Module  YOTMVEIC  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE yotmveic INPUT.
+*Tipos
+  TYPES:BEGIN OF ty_veic,
+          tragr        TYPE /sapapo/tragr,
+          tipo_recurso TYPE ys4e_tprec,
+        END OF ty_veic.
+
+*Tabelas Internas
+  DATA: lt_return_tab TYPE STANDARD TABLE OF ddshretval,
+        lt_veic       TYPE TABLE OF ty_veic,
+        lt_retval     TYPE TABLE OF ddshretval,
+        lt_dynp       TYPE TABLE OF dselc.
+
+*Variáveis.
+  DATA:lv_shlpname  TYPE shlpname VALUE 'YTMH_TRAGR',
+       lv_shlp      TYPE shlp_descr,
+       lv_recordpos TYPE i,
+       lv_cont      TYPE i,
+       lv_retfield  TYPE dfies-fieldname VALUE 'TRAGR'.
+
+*Estruturas
+  DATA:ls_veic TYPE ty_veic,
+       ls_dynp TYPE dselc.
+
+*Constantes
+  CONSTANTS: cc_org    TYPE ddbool_d VALUE 'S',
+             cc_tr(5)  TYPE c VALUE 'TRAGR',
+             cc_tp(12) TYPE c VALUE 'TIPO_RECURSO'.
+
+*Início
+  CALL FUNCTION 'F4IF_GET_SHLP_DESCR'
+    EXPORTING
+      shlpname = lv_shlpname
+    IMPORTING
+      shlp     = lv_shlp.
+
+  IF lv_shlp IS NOT INITIAL.
+
+    CALL FUNCTION 'F4IF_SELECT_VALUES'
+      EXPORTING
+        shlp           = lv_shlp
+        call_shlp_exit = abap_true
+      TABLES
+        return_tab     = lt_retval.
+
+    CLEAR:lt_veic[].
+    LOOP AT lt_retval INTO DATA(ls_retval).
+
+      ADD 1 TO lv_cont.
+
+      IF ls_retval-fieldname = cc_tr.
+        ls_veic-tragr = ls_retval-fieldval.
+      ENDIF.
+      IF ls_retval-fieldname = cc_tp.
+        ls_veic-tipo_recurso = ls_retval-fieldval.
+      ENDIF.
+
+      IF lv_cont = 2.
+        APPEND ls_veic TO lt_veic.
+        CLEAR:lv_cont,
+              ls_veic.
+      ENDIF.
+
+    ENDLOOP.
+
+    ls_dynp-dyfldname = 'GS_YOVP01-BEZEI'.
+    ls_dynp-fldname = cc_tp.
+    APPEND ls_dynp TO lt_dynp.
+
+    CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+      EXPORTING
+        ddic_structure  = 'YS4TM_E_REC'
+        retfield        = lv_retfield
+        value_org       = cc_org
+        dynpprog        = sy-cprog
+        dynpnr          = sy-dynnr
+        dynprofield     = 'GS_YOVP01-TRAGR'
+      TABLES
+        value_tab       = lt_veic
+        return_tab      = lt_return_tab
+        dynpfld_mapping = lt_dynp
+      EXCEPTIONS
+        parameter_error = 1
+        no_values_found = 2
+        OTHERS          = 3.
+    IF sy-subrc <> 0.
+* Implement suitable error handling here
+    ENDIF.
+  ENDIF.
+ENDMODULE.
